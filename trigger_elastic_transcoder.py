@@ -7,11 +7,11 @@ import json
 import boto3
 
 # Set all these variables when you upload (
-bucket_name = 'your-bucket'
-unconverted_prefix='unconverted'
-converted_prefix='ready'
-thumbnail_prefix='thumbnail'
-pipeline_id='your-pipeline-id'
+bucket_name = 'assets.domain.com'  #change this
+unconverted_prefix='media/'
+converted_prefix='transcoded/transcoded_'
+thumbnail_prefix='thumbnails/thumb_'
+pipeline_id='1518536024542-y0dk99' #change this
 
 # Semi-constant stuff
 preset_id='1351620000001-100070' # This is System Preset:Web, basically MP4 max size 1280x720
@@ -24,11 +24,12 @@ def start_et_handler(event, context):
     print ("Processing start handler")
 
     try:
-        if (event!=None and event.has_key('Records') and
+        print (event.get('Records'))
+        if (event!=None and 'Records' in event and
             len(event.get('Records'))==1 and
-            event.get('Records')[0].has_key('s3') and
-            event.get('Records')[0].get('s3').has_key('object') and
-            event.get('Records')[0].get('s3').get('object').has_key('key')):
+            's3' in event.get('Records')[0] and
+            'object' in event.get('Records')[0].get('s3') and
+            'key' in event.get('Records')[0].get('s3').get('object')):
 
             s3_object = event.get('Records')[0].get('s3').get('object')
             infile_key = s3_object.get('key')
@@ -41,14 +42,14 @@ def start_et_handler(event, context):
                 print("Started ok, subscribe to the SNS queue to find out when finished")
                 return {'status' : 'ok'}
             else :
-                return {'status' : 'ignored', 'message' : 'wrong path'}
+                return {'status' : 'ignored', 'message' : infile_key + ' has wrong path ' + unconverted_prefix}
 
         else :
             return {'status' : 'ignored', 'message':'Invalid input'}
 
     except Exception as exception:
         return {'status' : 'error',
-                'message' : exception.message}
+                'message' : exception}
 
 # This one deletes the source file when the target file shows up in the converted bucket
 def delete_source_after_et_finished_handler(event, context):
@@ -59,10 +60,10 @@ def delete_source_after_et_finished_handler(event, context):
         s3 = boto3.client('s3', region_name)
 
         try:
-            if (event!=None and event.has_key('Records') and
+            if (event!=None and 'Records' in event and
                         len(event.get('Records'))==1 and
-                    event.get('Records')[0].has_key('Sns') and
-                    event.get('Records')[0].get('Sns').has_key('Message')) :
+                    'Sns' in event.get('Records')[0] and
+                    'Message' in event.get('Records')[0].get('Sns')) :
                 message_string = event.get('Records')[0].get('Sns').get('Message')
                 message = json.loads(message_string)
                 state = message.get('state')
@@ -102,7 +103,7 @@ def start_transcode(in_file, out_file, thumbnail_pattern):
             },
             Outputs=[{
                 'Key': out_file,
-                #'ThumbnailPattern': thumbnail_pattern, turning this off for now
+                'ThumbnailPattern': thumbnail_pattern,
                 'PresetId': preset_id
             }]
-    )
+)
